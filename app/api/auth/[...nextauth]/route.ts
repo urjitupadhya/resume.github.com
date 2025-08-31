@@ -12,16 +12,29 @@ export const authOptions = {
   // adapter: firebaseAdapter,
   callbacks: {
     async session({ session, token }: any) {
+      console.log('NextAuth session callback - token:', token);
+      console.log('NextAuth session callback - session before:', session);
+      
       if (session?.user) {
         session.user.id = token.sub || token.id;
+        console.log('NextAuth session callback - setting user.id to:', session.user.id);
       }
+      
+      console.log('NextAuth session callback - session after:', session);
       return session;
     },
     async jwt({ token, user, account }: any) {
+      console.log('NextAuth jwt callback - token:', token);
+      console.log('NextAuth jwt callback - user:', user);
+      console.log('NextAuth jwt callback - account:', account);
+      
       if (account && user) {
         token.accessToken = account.access_token;
         token.id = user.id;
+        console.log('NextAuth jwt callback - setting token.id to:', token.id);
       }
+      
+      console.log('NextAuth jwt callback - final token:', token);
       return token;
     },
   },

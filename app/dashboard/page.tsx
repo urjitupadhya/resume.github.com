@@ -1,362 +1,247 @@
-'use client';
+"use client"
 
-import { useAuth } from '../../components/auth-provider';
-import { ProtectedRoute } from '../../components/protected-route';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { User, FileText, Settings, LogOut, Plus, Trash2 } from 'lucide-react';
-import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { getResumes, createResume, deleteResume } from '../../lib/firebase-utils';
-import { useToast } from '../../hooks/use-toast';
-
-interface Resume {
-  id: string;
-  title: string;
-  template: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useSession } from 'next-auth/react';
+import { useResumeData } from '@/hooks/use-resume-data';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ResumeManager } from '@/components/ResumeManager';
+import { ResumeData } from '@/hooks/use-resume-data';
+import { useRouter } from 'next/navigation';
+import { Plus, Edit, Eye, Download, Trash2, Calendar, Briefcase, GraduationCap, Code } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const { user, signOut } = useAuth();
-  const [resumes, setResumes] = useState<Resume[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const { toast } = useToast();
+  const { data: session, status } = useSession();
+  const { resumes, loading, error } = useResumeData();
+  const router = useRouter();
 
-  useEffect(() => {
-    if (user?.id) {
-      loadResumes();
-    }
-  }, [user?.id]);
+  console.log('Dashboard: session:', session);
+  console.log('Dashboard: session.user:', session?.user);
+  console.log('Dashboard: session.user.id:', session?.user?.id);
+  console.log('Dashboard: resumes:', resumes);
+  console.log('Dashboard: loading:', loading);
+  console.log('Dashboard: error:', error);
 
-  const loadResumes = async () => {
-    if (!user?.id) return;
-    
-    setIsLoading(true);
-    try {
-      const userResumes = await getResumes(user.id);
-      setResumes(userResumes);
-    } catch (error) {
-      console.error('Error loading resumes:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load resumes. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleCreateResume = async () => {
-    if (!user?.id) return;
-    
-    setIsCreating(true);
-    try {
-      const newResume = {
-        title: `New Resume ${resumes.length + 1}`,
-        template: 'modern',
-        content: {
-          personalInfo: {
-            name: user.name || '',
-            email: user.email || '',
-            phone: '',
-            location: '',
-            summary: ''
-          },
-          experience: [],
-          education: [],
-          skills: [],
-          projects: []
-        }
-      };
+  if (!session) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold mb-4">Welcome to Resume Builder</h1>
+          <p className="text-muted-foreground mb-6">Please sign in to access your dashboard.</p>
+          <Button onClick={() => router.push('/auth/signin')}>
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-      const result = await createResume(user.id, newResume);
-      
-      if (result.success) {
-        toast({
-          title: "Resume Created",
-          description: "Your new resume has been created successfully.",
-        });
-        await loadResumes(); // Reload the list
-      } else {
-        throw new Error('Failed to create resume');
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create resume. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleDeleteResume = async (resumeId: string) => {
-    if (!user?.id) return;
-    
-    try {
-      const result = await deleteResume(user.id, resumeId);
-      
-      if (result.success) {
-        toast({
-          title: "Resume Deleted",
-          description: "Resume has been deleted successfully.",
-        });
-        await loadResumes(); // Reload the list
-      } else {
-        throw new Error('Failed to delete resume');
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete resume. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
+  const handleLoadResume = (resume: ResumeData) => {
+    router.push(`/builder?resume=${resume.id}`);
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
+  const getResumeStats = (resume: ResumeData) => {
+    return {
+      experience: resume.experience.length,
+      education: resume.education.length,
+      projects: resume.selectedRepos.length,
+      lastUpdated: resume.updatedAt ? formatDate(resume.updatedAt) : 'Never',
+    };
+  };
+
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user?.name}!</p>
+    <div className="mx-auto max-w-7xl px-4 py-8 mt-16">
+      <header className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground mt-2">
+              Welcome back, {session.user?.name || 'User'}! Manage your resumes and portfolios.
+            </p>
+            <div className="text-xs text-muted-foreground mt-1">
+              User ID: {session.user?.id || 'Not set'} | Email: {session.user?.email || 'Not set'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              <button 
+                onClick={async () => {
+                  if (session?.user?.id) {
+                    try {
+                      const response = await fetch(`/api/test-db?userId=${session.user.id}`);
+                      const data = await response.json();
+                      console.log('Database test result:', data);
+                      alert(`Database test: ${data.message}`);
+                    } catch (error) {
+                      console.error('Database test error:', error);
+                      alert('Database test failed');
+                    }
+                  }
+                }}
+                className="text-blue-500 hover:text-blue-700 underline"
+              >
+                Test Database Connection
+              </button>
+            </div>
           </div>
+          <Button onClick={() => router.push('/builder')} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Resume
+          </Button>
+        </div>
+      </header>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Resumes</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{resumes.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  {resumes.length > 0 ? `Last updated ${formatDate(resumes[0]?.updatedAt || '')}` : 'No resumes yet'}
-                </p>
-              </CardContent>
-            </Card>
+      {error && (
+        <div className="mb-6 rounded-md bg-destructive/10 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Templates</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{resumes.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  {resumes.length > 0 ? 'Templates in use' : 'No templates active'}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Storage Used</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{resumes.length * 2}MB</div>
-                <p className="text-xs text-muted-foreground">
-                  {resumes.length > 0 ? 'Approximate storage' : 'No data stored'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <Card>
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>
-                  Get started with your resume building
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                  onClick={handleCreateResume} 
-                  className="w-full" 
-                  size="lg"
-                  disabled={isCreating}
-                >
-                  {isCreating ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  ) : (
-                    <Plus className="mr-2 h-4 w-4" />
-                  )}
-                  {isCreating ? 'Creating...' : 'Create New Resume'}
-                </Button>
-                <Link href="/profile" className="w-full">
-                  <Button variant="outline" className="w-full" size="lg">
-                    <User className="mr-2 h-4 w-4" />
-                    Edit Profile
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>
-                  Your latest resume updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {isLoading ? (
-                  <div className="space-y-3">
-                    <div className="animate-pulse">
-                      <div className="h-12 bg-gray-200 rounded-md"></div>
-                    </div>
-                    <div className="animate-pulse">
-                      <div className="h-12 bg-gray-200 rounded-md"></div>
-                    </div>
-                  </div>
-                ) : resumes.length > 0 ? (
-                  resumes.slice(0, 2).map((resume) => (
-                    <div key={resume.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium">{resume.title}</p>
-                          <p className="text-xs text-gray-500">
-                            Updated {formatDate(resume.updatedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Link href={`/builder/${resume.id}`}>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </Link>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDeleteResume(resume.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center text-gray-500 py-4">
-                    <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                    <p>No resumes yet</p>
-                    <p className="text-sm">Create your first resume to get started</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Resumes List */}
-          {resumes.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>All Resumes</CardTitle>
-                <CardDescription>
-                  Manage and edit your resumes
-                </CardDescription>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {resumes.map((resume) => (
-                    <div key={resume.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <p className="font-medium">{resume.title}</p>
-                          <p className="text-sm text-gray-500">
-                            Template: {resume.template} • Created: {formatDate(resume.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Link href={`/builder/${resume.id}`}>
-                          <Button variant="outline" size="sm">
-                            Edit Resume
-                          </Button>
-                        </Link>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDeleteResume(resume.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                  <div className="h-3 bg-muted rounded w-2/3"></div>
+                  <div className="h-3 bg-muted rounded w-1/3"></div>
                 </div>
               </CardContent>
             </Card>
-          )}
+          ))}
+        </div>
+      ) : resumes.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+            <Plus className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">No resumes yet</h2>
+          <p className="text-muted-foreground mb-6">
+            Create your first resume to get started with building your professional portfolio.
+          </p>
+          <Button onClick={() => router.push('/builder')} size="lg">
+            Create Your First Resume
+          </Button>
+          </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {resumes.map((resume) => {
+              const stats = getResumeStats(resume);
+              return (
+                <Card key={resume.id} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">{resume.title}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Last updated {stats.lastUpdated}
+                          </p>
+                        </div>
+                      </div>
+              </CardHeader>
+              <CardContent>
+                    <div className="space-y-4">
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="text-center p-2 bg-muted rounded">
+                          <Briefcase className="h-3 w-3 mx-auto mb-1" />
+                          <span className="font-medium">{stats.experience}</span>
+                          <div className="text-muted-foreground">Experience</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted rounded">
+                          <GraduationCap className="h-3 w-3 mx-auto mb-1" />
+                          <span className="font-medium">{stats.education}</span>
+                          <div className="text-muted-foreground">Education</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted rounded">
+                          <Code className="h-3 w-3 mx-auto mb-1" />
+                          <span className="font-medium">{stats.projects}</span>
+                          <div className="text-muted-foreground">Projects</div>
+                        </div>
+                      </div>
 
-          {/* Account Management */}
+                      {/* Actions */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleLoadResume(resume)}
+                          className="flex-1"
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                          </Button>
+                        <Button 
+                          size="sm"
+                          variant="outline" 
+                          onClick={() => router.push(`/resumes/${resume.id}`)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                </div>
+              </CardContent>
+            </Card>
+              );
+            })}
+          </div>
+
+          {/* Quick Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Account Management</CardTitle>
-              <CardDescription>
-                Manage your account settings and preferences
-              </CardDescription>
+              <CardTitle>Quick Stats</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <User className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium">Profile Information</p>
-                    <p className="text-sm text-gray-500">Update your personal details</p>
-                  </div>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{resumes.length}</div>
+                  <div className="text-sm text-muted-foreground">Total Resumes</div>
                 </div>
-                <Link href="/profile">
-                  <Button variant="outline" size="sm">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Manage
-                  </Button>
-                </Link>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {resumes.reduce((acc, r) => acc + r.experience.length, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Experience</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {resumes.reduce((acc, r) => acc + r.education.length, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total Education</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {resumes.reduce((acc, r) => acc + r.selectedRepos.length, 0)}
               </div>
-
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <LogOut className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium">Sign Out</p>
-                    <p className="text-sm text-gray-500">Sign out of your account</p>
+                  <div className="text-sm text-muted-foreground">Total Projects</div>
                   </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
+      )}
       </div>
-    </ProtectedRoute>
   );
 }

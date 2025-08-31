@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         email: user.email || '',
         avatar: user.image || '',
       },
-      resumes: {},
+      // Don't overwrite existing resumes - let them persist
       settings: {
         theme: 'light',
         notifications: true,

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Target } from "lucide-react";
 import FeatureBadges from "./featureBadges";
-import TrustIndicators from "./trustIndicators";
+// import TrustIndicators from "./trustIndicators";
 import ResumePreview from "./resumePreview";
 
 const HeroSection = () => {
@@ -12,7 +12,7 @@ const HeroSection = () => {
       <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl"></div>
       
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center min-h-screen py-12">
           {/* Left Column - Content */}
           <div className="space-y-8">
@@ -53,7 +53,7 @@ const HeroSection = () => {
             </div>
 
             {/* Trust indicators */}
-            <TrustIndicators />
+            {/* <TrustIndicators /> */}
           </div>
 
           {/* Right Column - Resume Preview */}

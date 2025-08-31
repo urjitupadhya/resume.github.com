@@ -18,19 +18,19 @@ const Navigation = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <h1 className="text-2xl font-bold gradient-text">
-              TalentElse
+              Resume Builder
             </h1>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
-              <a
+              <Link
                 href="/#"
                 className="text-foreground hover:text-primary transition-colors duration-200 font-medium"
               >
                 Home
-              </a>
+              </Link>
               <Link
                 href="/builder"
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
@@ -45,30 +45,30 @@ const Navigation = () => {
                   Dashboard
                 </Link>
               )}
-              <a
-                href="#"
+              <Link
+                href="/templates"
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
               >
                 Templates
-              </a>
-              <a
-                href="#"
+              </Link>
+              <Link
+                href="/atsScore"
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
               >
                 ATS Score
-              </a>
-              <a
-                href="#"
+              </Link>
+              <Link
+                href="/about"
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
               >
                 About
-              </a>
-              <a
-                href="#"
+              </Link>
+              <Link
+                href="/contact"
                 className="text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
               >
                 Contact
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -114,18 +114,18 @@ const Navigation = () => {
       {isMenuOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 glass-morphism border-t border-white/10">
-            <a
-              href="#"
+            <Link
+              href="/"
               className="block px-3 py-2 text-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               Home
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/builder"
               className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               Builder
-            </a>
+            </Link>
             {isAuthenticated && (
               <Link
                 href="/dashboard"
@@ -134,30 +134,30 @@ const Navigation = () => {
                 Dashboard
               </Link>
             )}
-            <a
-              href="#"
+            <Link
+              href="/templates"
               className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               Templates
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/atsScore"
               className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               ATS Score
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/about"
               className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               About
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/contact"
               className="block px-3 py-2 text-muted-foreground hover:text-primary transition-colors duration-200 font-medium"
             >
               Contact
-            </a>
+            </Link>
             <div className="px-3 py-2 space-y-2">
               {isAuthenticated ? (
                 <>

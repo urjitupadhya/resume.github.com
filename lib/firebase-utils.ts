@@ -1,15 +1,46 @@
 import { ref, set, get, push, remove, update, query, orderByChild, limitToFirst, onValue, off } from 'firebase/database';
-import { db } from './firebase';
+import { db } from '@/lib/firebase';
+
+// Utility function to remove undefined values from objects
+const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefinedValues).filter(item => item !== null);
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+};
 
 // User management functions
 export const createUser = async (userId: string, userData: any) => {
   try {
     const userRef = ref(db, `users/${userId}`);
-    await set(userRef, {
+    
+    // Check if user already exists to preserve existing data
+    const existingUser = await getUser(userId);
+    
+    const finalUserData = {
       ...userData,
-      createdAt: new Date().toISOString(),
+      // Preserve existing resumes if they exist
+      resumes: existingUser?.resumes || userData.resumes || {},
+      createdAt: existingUser?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    await set(userRef, finalUserData);
     return { success: true, userId };
   } catch (error) {
     console.error('Error creating user:', error);
@@ -31,10 +62,18 @@ export const getUser = async (userId: string) => {
 export const updateUser = async (userId: string, updates: any) => {
   try {
     const userRef = ref(db, `users/${userId}`);
-    await update(userRef, {
+    
+    // Get existing user data to preserve resumes
+    const existingUser = await getUser(userId);
+    
+    const finalUpdates = {
       ...updates,
+      // Preserve existing resumes if they exist
+      resumes: existingUser?.resumes || updates.resumes || {},
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    await update(userRef, finalUpdates);
     return { success: true };
   } catch (error) {
     console.error('Error updating user:', error);
@@ -56,16 +95,29 @@ export const deleteUser = async (userId: string) => {
 // Resume management functions
 export const createResume = async (userId: string, resumeData: any) => {
   try {
+    console.log('createResume: Called with userId:', userId);
+    console.log('createResume: User ID type:', typeof userId);
+    console.log('createResume: User ID length:', userId?.length);
+    console.log('createResume: Resume data:', resumeData);
+    
     const resumesRef = ref(db, `users/${userId}/resumes`);
+    console.log('createResume: Database path:', `users/${userId}/resumes`);
+    
     const newResumeRef = push(resumesRef);
     const resumeId = newResumeRef.key;
+    console.log('createResume: Generated resumeId:', resumeId);
     
-    await set(newResumeRef, {
+    // Clean the data by removing undefined values
+    const cleanedData = removeUndefinedValues({
       ...resumeData,
       id: resumeId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    
+    console.log('createResume: Cleaned data:', cleanedData);
+    await set(newResumeRef, cleanedData);
+    console.log('createResume: Successfully saved to database');
     
     return { success: true, resumeId };
   } catch (error) {
@@ -76,16 +128,27 @@ export const createResume = async (userId: string, resumeData: any) => {
 
 export const getResumes = async (userId: string) => {
   try {
+    console.log('getResumes: Called with userId:', userId);
+    console.log('getResumes: User ID type:', typeof userId);
+    console.log('getResumes: User ID length:', userId?.length);
+    
     const resumesRef = ref(db, `users/${userId}/resumes`);
+    console.log('getResumes: Database path:', `users/${userId}/resumes`);
+    
     const snapshot = await get(resumesRef);
+    console.log('getResumes: Snapshot exists:', snapshot.exists());
+    console.log('getResumes: Snapshot value:', snapshot.val());
     
     if (snapshot.exists()) {
       const resumes = snapshot.val();
-      return Object.keys(resumes).map(key => ({
+      const result = Object.keys(resumes).map(key => ({
         id: key,
         ...resumes[key]
       }));
+      console.log('getResumes: Returning resumes:', result);
+      return result;
     }
+    console.log('getResumes: No resumes found, returning empty array');
     return [];
   } catch (error) {
     console.error('Error getting resumes:', error);
@@ -107,10 +170,14 @@ export const getResume = async (userId: string, resumeId: string) => {
 export const updateResume = async (userId: string, resumeId: string, updates: any) => {
   try {
     const resumeRef = ref(db, `users/${userId}/resumes/${resumeId}`);
-    await update(resumeRef, {
+    
+    // Clean the data by removing undefined values
+    const cleanedUpdates = removeUndefinedValues({
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+    
+    await update(resumeRef, cleanedUpdates);
     return { success: true };
   } catch (error) {
     console.error('Error updating resume:', error);
@@ -144,21 +211,34 @@ export const subscribeToUser = (userId: string, callback: (userData: any) => voi
 };
 
 export const subscribeToResumes = (userId: string, callback: (resumes: any[]) => void) => {
+  console.log('subscribeToResumes: Setting up subscription for userId:', userId);
+  console.log('subscribeToResumes: User ID type:', typeof userId);
+  console.log('subscribeToResumes: User ID length:', userId?.length);
+  
   const resumesRef = ref(db, `users/${userId}/resumes`);
+  console.log('subscribeToResumes: Database path:', `users/${userId}/resumes`);
+  
   const unsubscribe = onValue(resumesRef, (snapshot) => {
+    console.log('subscribeToResumes: Snapshot received:', snapshot.exists(), snapshot.val());
     if (snapshot.exists()) {
       const resumes = snapshot.val();
+      console.log('subscribeToResumes: Raw resumes data:', resumes);
       const resumeList = Object.keys(resumes).map(key => ({
         id: key,
         ...resumes[key]
       }));
+      console.log('subscribeToResumes: Processed resumeList:', resumeList);
       callback(resumeList);
     } else {
+      console.log('subscribeToResumes: No resumes found, calling callback with empty array');
       callback([]);
     }
   });
   
-  return () => off(resumesRef, 'value', unsubscribe);
+  return () => {
+    console.log('subscribeToResumes: Cleaning up subscription');
+    off(resumesRef, 'value', unsubscribe);
+  };
 };
 
 // Search and query functions

@@ -24,33 +24,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [status]);
 
-  // Save user data to Firebase after successful authentication
-  useEffect(() => {
-    if (session?.user && !loading) {
-      saveUserToFirebase();
-    }
-  }, [session, loading]);
-
-  const saveUserToFirebase = async () => {
-    if (!session?.user) return;
-
-    try {
-      const response = await fetch('/api/user/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        console.log('User data saved to Firebase successfully');
-      } else {
-        console.error('Failed to save user data to Firebase');
-      }
-    } catch (error) {
-      console.error('Error saving user data to Firebase:', error);
-    }
-  };
+  // Note: Removed automatic user save to Firebase to prevent data loss
+  // User data will be saved only when explicitly needed (e.g., creating resumes)
 
   const handleSignIn = () => {
     signIn('google');
@@ -71,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
+      
     </AuthContext.Provider>
   );
 }

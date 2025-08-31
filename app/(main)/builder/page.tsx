@@ -1,11 +1,15 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { ResumeManager } from "@/components/ResumeManager"
+import { AutoSave } from "@/components/AutoSave"
+import { useResumeData, ResumeData } from "@/hooks/use-resume-data"
 
 type Experience = {
   id: string
@@ -51,29 +55,7 @@ type GitHubRepo = {
   html_url: string
 }
 
-type PortfolioState = {
-  githubUrl: string
-  selectedRepos: string[]
-  experience: Experience[]
-  education: Education[]
-  template: "modern" | "creative" | "corporate" | "developer"
-  colorScheme: "default" | "green" | "gray"
-  name?: string
-  role?: string
-  location?: string
-  bio?: string
-  links: {
-    linkedin?: string
-    twitter?: string
-    website?: string
-    email?: string
-  }
-  githubProfile?: GitHubProfile
-  repos: GitHubRepo[]
-  summaries?: Record<string, string[]>
-  seoTitle?: string
-  seoDescription?: string
-}
+type PortfolioState = ResumeData
 
 const steps = [
   { id: 1, title: "GitHub" },
@@ -85,8 +67,10 @@ const steps = [
 ] as const
 
 export default function HomePage() {
+  const { data: session } = useSession()
   const [current, setCurrent] = useState<number>(1)
   const [state, setState] = useState<PortfolioState>({
+    title: "New Resume",
     githubUrl: "",
     selectedRepos: [],
     experience: [],
@@ -96,8 +80,6 @@ export default function HomePage() {
     links: {},
     repos: [],
     summaries: {},
-    seoTitle: "",
-    seoDescription: "",
   })
 
   const progress = useMemo(() => (current / steps.length) * 100, [current])
@@ -152,50 +134,51 @@ export default function HomePage() {
     }
   }
 
+  // Load resume data when user is authenticated
+  const { loadResume } = useResumeData()
+
+  const handleLoadResume = (resume: ResumeData) => {
+    setState(resume)
+  }
+
+  // Load resume from URL parameter
   useEffect(() => {
-    const savedState = localStorage.getItem("portfolioState")
-    if (savedState) {
-      setState(JSON.parse(savedState))
+    const urlParams = new URLSearchParams(window.location.search);
+    const resumeId = urlParams.get('resume');
+    
+    if (resumeId && session?.user?.id) {
+      loadResume(resumeId).then((loadedResume) => {
+        if (loadedResume) {
+          setState(loadedResume);
+        }
+      });
     }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem("portfolioState", JSON.stringify(state))
-  }, [state])
-
-  useEffect(() => {
-    try {
-      const rawExp = localStorage.getItem("portfolio_experience")
-      const rawEdu = localStorage.getItem("portfolio_education")
-      setState((s) => ({
-        ...s,
-        experience: s.experience.length === 0 && rawExp ? (JSON.parse(rawExp) as Experience[]) : s.experience,
-        education: s.education.length === 0 && rawEdu ? (JSON.parse(rawEdu) as Education[]) : s.education,
-      }))
-    } catch {
-      // ignore parse errors
-    }
-  }, [])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("portfolio_experience", JSON.stringify(state.experience))
-    } catch {}
-  }, [state.experience])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("portfolio_education", JSON.stringify(state.education))
-    } catch {}
-  }, [state.education])
+  }, [session?.user?.id, loadResume]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8 mt-16">
       <header className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
         <h1 className="text-pretty text-2xl font-semibold text-foreground">Portfolio Generator</h1>
         <p className="text-muted-foreground">Create a professional portfolio from your GitHub and experience.</p>
+          </div>
+          {session && (
+            <div className="flex items-center gap-2">
+              <AutoSave resumeData={state} enabled={!!session} />
+            </div>
+          )}
+        </div>
       </header>
 
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left: Resume Manager */}
+        <section aria-label="Resume Manager" className="lg:col-span-1">
+          <ResumeManager onLoadResume={handleLoadResume} currentResume={state} />
+        </section>
+
+        {/* Center: Wizard */}
+        <section aria-label="Wizard" className="lg:col-span-2 space-y-4">
       <div className="mb-4 h-2 w-full rounded-full bg-muted">
         <div
           className="h-2 rounded-full bg-primary transition-all"
@@ -207,9 +190,6 @@ export default function HomePage() {
         />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Left: Wizard */}
-        <section aria-label="Wizard" className="space-y-4">
           <StepNav current={current} onStepChange={setCurrent} />
           <Card>
             <CardHeader>
@@ -271,8 +251,10 @@ export default function HomePage() {
             </CardContent>
           </Card>
         </section>
+      </div>
 
-        {/* Right: Live Preview */}
+      {/* Right: Live Preview - Full width below on smaller screens */}
+      <div className="mt-6">
         <section aria-label="Live Preview">
           <PortfolioPreview state={state} />
         </section>
