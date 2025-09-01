@@ -44,7 +44,8 @@ export const authOptions = {
     error: '/auth/error',
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
+  // Disable debug in production to avoid the warning
+  debug: false,
 };
 
 const handler = NextAuth(authOptions);

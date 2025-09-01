@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useMemo, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
@@ -72,6 +74,7 @@ export default function HomePage() {
   const [state, setState] = useState<PortfolioState>({
     title: "New Resume",
     githubUrl: "",
+    githubId: "", // Initialize GitHub ID field
     selectedRepos: [],
     experience: [],
     education: [],
@@ -80,7 +83,9 @@ export default function HomePage() {
     links: {},
     repos: [],
     summaries: {},
+    noexperienced: false, // Initialize no experience flag
   })
+  const [overlayMode, setOverlayMode] = useState<null | "edit" | "preview">(null)
 
   const progress = useMemo(() => (current / steps.length) * 100, [current])
 
@@ -102,16 +107,33 @@ export default function HomePage() {
       if (!res.ok) {
         return { ok: false, error: data?.error || "Failed to fetch GitHub data" }
       }
-      setState((s) => ({
-        ...s,
-        githubProfile: data.profile,
-        repos: data.repos ?? [],
-        name: s.name || data.profile?.name || s.name,
-        bio: s.bio || data.profile?.bio || s.bio,
-        location: s.location || data.profile?.location || s.location,
-      }))
+      
+      // Log the GitHub data received
+      console.log("fetchGitHub: Received profile data:", data.profile)
+      console.log("fetchGitHub: Received repos count:", data.repos?.length)
+      
+      // Extract the GitHub username (login) from the profile data
+      const githubId = data.profile?.login || ""
+      console.log("fetchGitHub: GitHub ID (username):", githubId)
+      
+      setState((s) => {
+        const updatedState = {
+          ...s,
+          githubUrl: profileUrl, // Ensure the URL is saved
+          githubId: githubId, // Store GitHub ID (username) explicitly
+          githubProfile: data.profile,
+          repos: data.repos ?? [],
+          name: s.name || data.profile?.name || s.name,
+          bio: s.bio || data.profile?.bio || s.bio,
+          location: s.location || data.profile?.location || s.location,
+        }
+        console.log("fetchGitHub: Updated state:", updatedState)
+        console.log("fetchGitHub: GitHub ID saved:", updatedState.githubId)
+        return updatedState
+      })
       return { ok: true }
     } catch (e: any) {
+      console.error("fetchGitHub error:", e)
       return { ok: false, error: e?.message || "Network error" }
     }
   }
@@ -156,7 +178,7 @@ export default function HomePage() {
   }, [session?.user?.id, loadResume]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 mt-16">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -168,6 +190,17 @@ export default function HomePage() {
               <AutoSave resumeData={state} enabled={!!session} />
             </div>
           )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <Button variant="outline" onClick={() => setOverlayMode("edit")}>
+            Live Edit (Full Screen)
+          </Button>
+          <Button
+            className="bg-primary text-primary-foreground hover:opacity-90"
+            onClick={() => setOverlayMode("preview")}
+          >
+            Live Preview (Full Screen)
+          </Button>
         </div>
       </header>
 
@@ -220,13 +253,22 @@ export default function HomePage() {
               )}
 
               {current === 3 && (
-                <ExperienceStep
-                  value={state.experience}
-                  onChange={(experience) => setState((s) => ({ ...s, experience }))}
-                  onPrev={prev}
-                  onNext={next}
-                />
-              )}
+          <ExperienceStep
+            value={state.experience}
+            onChange={(experience) => {
+              console.log('Experience data being updated in state:', experience);
+              setState((s) => {
+                const updatedState = { ...s, experience };
+                console.log('Updated state with new experience data:', updatedState);
+                return updatedState;
+              });
+            }}
+            noexperienced={state.noexperienced}
+            onNoExperiencedChange={(noexperienced) => setState((s) => ({ ...s, noexperienced }))}
+            onPrev={prev}
+            onNext={next}
+          />
+        )}
 
               {current === 4 && (
                 <EducationStep
@@ -259,6 +301,26 @@ export default function HomePage() {
           <PortfolioPreview state={state} />
         </section>
       </div>
+
+      {overlayMode && (
+        <FullscreenOverlay
+          title={overlayMode === "edit" ? "Live Edit" : "Live Preview"}
+          onClose={() => setOverlayMode(null)}
+        >
+          {overlayMode === "edit" ? (
+            <LiveEditResume state={state} onChange={setState} onDone={() => setOverlayMode(null)} />
+          ) : (
+            <div className="mx-auto h-full w-full max-w-4xl overflow-auto p-6">
+              <PortfolioPreview state={state} />
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" onClick={() => setOverlayMode(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </FullscreenOverlay>
+      )}
     </main>
   )
 }
@@ -587,11 +649,15 @@ function ExperienceStep({
   onChange,
   onPrev,
   onNext,
+  noexperienced,
+  onNoExperiencedChange,
 }: {
   value: Experience[]
   onChange: (exp: Experience[]) => void
   onPrev: () => void
   onNext: () => void
+  noexperienced?: boolean
+  onNoExperiencedChange?: (value: boolean) => void
 }) {
   // Minimal add-one form; advanced features (drag-and-drop, autosave) will come later
   const [draft, setDraft] = useState<Experience>({
@@ -607,12 +673,22 @@ function ExperienceStep({
 
   const addBullet = () => {
     if (!bullet.trim()) return
-    setDraft((d) => ({ ...d, bullets: [...d.bullets, bullet.trim()] }))
+    console.log('Adding bullet to experience:', bullet.trim())
+    const updatedBullets = [...draft.bullets, bullet.trim()]
+    console.log('Updated bullets array:', updatedBullets)
+    setDraft((d) => {
+      const updated = { ...d, bullets: updatedBullets }
+      console.log('Updated draft with new bullet:', updated)
+      return updated
+    })
     setBullet("")
   }
   const addRole = () => {
     if (!draft.title || !draft.company) return
-    onChange([...value, draft])
+    console.log('Adding experience role:', draft)
+    const updatedExperience = [...value, draft]
+    console.log('Updated experience array:', updatedExperience)
+    onChange(updatedExperience)
     setDraft({
       id: crypto.randomUUID(),
       title: "",
@@ -644,34 +720,44 @@ function ExperienceStep({
           placeholder="Job title"
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          disabled={noexperienced}
         />
         <Input
           placeholder="Company"
           value={draft.company}
           onChange={(e) => setDraft({ ...draft, company: e.target.value })}
+          disabled={noexperienced}
         />
         <Input
           placeholder="Start (e.g., Jan 2022)"
           value={draft.start}
           onChange={(e) => setDraft({ ...draft, start: e.target.value })}
+          disabled={noexperienced}
         />
         <Input
           placeholder="End (e.g., Present)"
           value={draft.end}
           onChange={(e) => setDraft({ ...draft, end: e.target.value })}
+          disabled={noexperienced}
         />
         <Input
           placeholder="Technologies (comma-separated)"
           value={draft.tech}
           onChange={(e) => setDraft({ ...draft, tech: e.target.value })}
           className="md:col-span-2"
+          disabled={noexperienced}
         />
       </div>
 
       <div className="grid gap-2">
         <div className="flex items-center gap-2">
-          <Input placeholder="Add responsibility bullet" value={bullet} onChange={(e) => setBullet(e.target.value)} />
-          <Button type="button" onClick={addBullet}>
+          <Input 
+            placeholder="Add responsibility bullet" 
+            value={bullet} 
+            onChange={(e) => setBullet(e.target.value)} 
+            disabled={noexperienced}
+          />
+          <Button type="button" onClick={addBullet} disabled={noexperienced}>
             Add
           </Button>
         </div>
@@ -684,14 +770,29 @@ function ExperienceStep({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={onPrev}>
-          Back
-        </Button>
-        <Button onClick={addRole}>Add position</Button>
-        <Button onClick={onNext} className="bg-primary text-primary-foreground hover:opacity-90">
-          Continue
-        </Button>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="noexperienced"
+            checked={noexperienced}
+            onChange={(e) => onNoExperiencedChange?.(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          />
+          <label htmlFor="noexperienced" className="text-sm text-muted-foreground">
+            I don't have any work experience
+          </label>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onPrev}>
+            Back
+          </Button>
+          <Button onClick={addRole} disabled={noexperienced}>Add position</Button>
+          <Button onClick={onNext} className="bg-primary text-primary-foreground hover:opacity-90">
+            Continue
+          </Button>
+        </div>
       </div>
 
       {value.length > 0 && (
@@ -1361,5 +1462,337 @@ function PortfolioPreview({ state }: { state: PortfolioState }) {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function FullscreenOverlay({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="fixed inset-0 z-50 flex h-full w-full flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+    >
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <p className="text-pretty text-lg font-semibold">{title}</p>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Press Esc to close</span>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">{children}</div>
+    </div>
+  )
+}
+
+function EditableInline({
+  value,
+  onChange,
+  className,
+  ariaLabel,
+  multiline = false,
+}: {
+  value?: string
+  onChange: (v: string) => void
+  className?: string
+  ariaLabel: string
+  multiline?: boolean
+}) {
+  function handleInput(e: React.FormEvent<HTMLElement>) {
+    const txt = (e.currentTarget as HTMLElement).innerText
+    onChange(txt)
+  }
+  const Comp: any = multiline ? "div" : "span"
+  return (
+    <Comp
+      role="textbox"
+      aria-label={ariaLabel}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={handleInput}
+      className={cn(
+        "outline-none ring-0 focus:outline-none focus:ring-2 focus:ring-primary/40",
+        multiline && "whitespace-pre-wrap",
+        className,
+      )}
+    >
+      {value || ""}
+    </Comp>
+  )
+}
+
+function LiveEditResume({
+  state,
+  onChange,
+  onDone,
+}: {
+  state: PortfolioState
+  onChange: React.Dispatch<React.SetStateAction<PortfolioState>>
+  onDone: () => void
+}) {
+  // helpers to update nested arrays immutably
+  const updateExperience = (id: string, patch: Partial<Experience>) => {
+    onChange((s) => ({
+      ...s,
+      experience: s.experience.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    }))
+  }
+  const updateExperienceBullet = (id: string, index: number, txt: string) => {
+    onChange((s) => ({
+      ...s,
+      experience: s.experience.map((e) =>
+        e.id === id ? { ...e, bullets: e.bullets.map((b, i) => (i === index ? txt : b)) } : e,
+      ),
+    }))
+  }
+  const updateEducation = (id: string, patch: Partial<Education>) => {
+    onChange((s) => ({
+      ...s,
+      education: s.education.map((ed) => (ed.id === id ? { ...ed, ...patch } : ed)),
+    }))
+  }
+  const updateSummaryBullet = (fullName: string, idx: number, txt: string) => {
+    onChange((s) => {
+      const next = { ...(s.summaries || {}) }
+      const arr = (next[fullName] || []).slice()
+      if (idx < arr.length) arr[idx] = txt
+      next[fullName] = arr
+      return { ...s, summaries: next }
+    })
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-4xl p-6">
+      <header className="mb-6 space-y-2">
+        <EditableInline
+          ariaLabel="Name"
+          value={state.name}
+          onChange={(v) => onChange((s) => ({ ...s, name: v }))}
+          className={cn(
+            "block text-2xl font-semibold",
+            state.colorScheme === "gray" ? "text-foreground" : "text-primary",
+          )}
+        />
+        <EditableInline
+          ariaLabel="Role"
+          value={state.role}
+          onChange={(v) => onChange((s) => ({ ...s, role: v }))}
+          className="block text-sm text-muted-foreground"
+        />
+        <EditableInline
+          ariaLabel="Location"
+          value={state.location}
+          onChange={(v) => onChange((s) => ({ ...s, location: v }))}
+          className="block text-xs text-muted-foreground"
+        />
+
+        <div className="mt-3">
+          <EditableInline
+            ariaLabel="Bio"
+            value={state.bio}
+            multiline
+            onChange={(v) => onChange((s) => ({ ...s, bio: v }))}
+            className={cn(
+              "block text-sm leading-relaxed",
+              state.template === "corporate" && "border-l-2 border-primary/30 pl-3",
+            )}
+          />
+        </div>
+      </header>
+
+      <section className="space-y-3">
+        <h3 className={cn("text-sm font-medium", state.colorScheme === "gray" ? "text-foreground" : "text-primary")}>
+          Projects
+        </h3>
+        {state.selectedRepos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Select up to 3 repositories to showcase.</p>
+        ) : (
+          <ul className="grid gap-3">
+            {state.selectedRepos.map((full) => {
+              const r = state.repos.find((x) => x.full_name === full)
+              const s = state.summaries?.[full] || []
+              return (
+                <li key={full} className="rounded-md border p-3">
+                  <p className="text-sm font-medium">{r?.name ?? full}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    {r?.language && <span>{r.language}</span>}
+                    {typeof r?.stargazers_count === "number" && <span>★ {r.stargazers_count}</span>}
+                    {typeof r?.forks_count === "number" && <span>⑂ {r.forks_count}</span>}
+                    {r?.updated_at && <span>Updated {new Date(r.updated_at).toLocaleDateString()}</span>}
+                    {r?.html_url && (
+                      <a
+                        href={r.html_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        GitHub
+                      </a>
+                    )}
+                  </div>
+                  <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">
+                    {s.length > 0 ? (
+                      s.map((b, i) => (
+                        <li key={i}>
+                          <EditableInline
+                            ariaLabel={`Project bullet ${i + 1}`}
+                            value={b}
+                            onChange={(v) => updateSummaryBullet(full, i, v)}
+                            className="inline"
+                          />
+                        </li>
+                      ))
+                    ) : (
+                      <>
+                        <li className="opacity-70">Primary purpose will be generated</li>
+                        <li className="opacity-70">Key technologies detected</li>
+                        <li className="opacity-70">Notable features/achievements</li>
+                      </>
+                    )}
+                  </ul>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-6 space-y-3">
+        <h3 className={cn("text-sm font-medium", state.colorScheme === "gray" ? "text-foreground" : "text-primary")}>
+          Experience
+        </h3>
+        {state.experience.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Add your positions and responsibilities.</p>
+        ) : (
+          <ul className="space-y-3">
+            {state.experience.map((e) => (
+              <li key={e.id} className="rounded-md border p-3">
+                <p className="text-sm font-medium">
+                  <EditableInline
+                    ariaLabel="Job title"
+                    value={e.title}
+                    onChange={(v) => updateExperience(e.id, { title: v })}
+                    className="mr-1"
+                  />
+                  •
+                  <EditableInline
+                    ariaLabel="Company"
+                    value={e.company}
+                    onChange={(v) => updateExperience(e.id, { company: v })}
+                    className="ml-1"
+                  />
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <EditableInline
+                    ariaLabel="Start date"
+                    value={e.start}
+                    onChange={(v) => updateExperience(e.id, { start: v })}
+                    className="mr-1"
+                  />
+                  -
+                  <EditableInline
+                    ariaLabel="End date"
+                    value={e.end}
+                    onChange={(v) => updateExperience(e.id, { end: v })}
+                    className="ml-1"
+                  />
+                </p>
+                {e.bullets.length > 0 && (
+                  <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
+                    {e.bullets.map((b, i) => (
+                      <li key={i}>
+                        <EditableInline
+                          ariaLabel={`Experience bullet ${i + 1}`}
+                          value={b}
+                          onChange={(v) => updateExperienceBullet(e.id, i, v)}
+                          className="inline"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-1 text-xs">
+                  Tech:&nbsp;
+                  <EditableInline
+                    ariaLabel="Technologies"
+                    value={e.tech}
+                    onChange={(v) => updateExperience(e.id, { tech: v })}
+                    className="inline"
+                  />
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {state.education.length > 0 && (
+        <section className="mt-6 space-y-3">
+          <h3 className={cn("text-sm font-medium", state.colorScheme === "gray" ? "text-foreground" : "text-primary")}>
+            Education
+          </h3>
+          <ul className="space-y-3">
+            {state.education.map((ed) => (
+              <li key={ed.id} className="rounded-md border p-3">
+                <p className="text-sm font-medium">
+                  <EditableInline
+                    ariaLabel="Degree"
+                    value={ed.degree}
+                    onChange={(v) => updateEducation(ed.id, { degree: v })}
+                    className="mr-1"
+                  />
+                  •
+                  <EditableInline
+                    ariaLabel="Institution"
+                    value={ed.institution}
+                    onChange={(v) => updateEducation(ed.id, { institution: v })}
+                    className="ml-1"
+                  />
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <EditableInline
+                    ariaLabel="Field of study"
+                    value={ed.field}
+                    onChange={(v) => updateEducation(ed.id, { field: v })}
+                    className="mr-1"
+                  />
+                  •
+                  <EditableInline
+                    ariaLabel="Graduation year"
+                    value={ed.year}
+                    onChange={(v) => updateEducation(ed.id, { year: v })}
+                    className="ml-1"
+                  />
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="mt-8 flex justify-end">
+        <Button onClick={onDone} className="bg-primary text-primary-foreground hover:opacity-90">
+          Done
+        </Button>
+      </div>
+    </div>
   )
 }

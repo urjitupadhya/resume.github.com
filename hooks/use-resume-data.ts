@@ -13,6 +13,7 @@ export interface ResumeData {
   id?: string;
   title: string;
   githubUrl: string;
+  githubId?: string; // GitHub username/ID
   selectedRepos: string[];
   experience: Experience[];
   education: Education[];
@@ -33,6 +34,7 @@ export interface ResumeData {
   summaries?: Record<string, string[]>;
   seoTitle?: string;
   seoDescription?: string;
+  noexperienced?: boolean; // Flag for no experience
   createdAt?: string;
   updatedAt?: string;
 }
@@ -83,20 +85,54 @@ export interface GitHubRepo {
 
 // Helper function to ensure resume data has proper structure
 const ensureResumeStructure = (resume: any): ResumeData => {
+  // Make sure we have a valid resume object
+  if (!resume) {
+    console.error('ensureResumeStructure: Resume is null or undefined');
+    resume = {};
+  }
+  
+  // Ensure experience is properly initialized and each experience has all required fields
+  let experience = [];
+  if (Array.isArray(resume.experience)) {
+    experience = resume.experience.map(exp => ({
+      id: exp.id || crypto.randomUUID(),
+      title: exp.title || '',
+      company: exp.company || '',
+      start: exp.start || '',
+      end: exp.end || '',
+      bullets: Array.isArray(exp.bullets) ? exp.bullets : [],
+      tech: exp.tech || ''
+    }));
+  }
+  
+  // Ensure education is properly initialized
+  const education = Array.isArray(resume.education) ? resume.education : [];
+  
+  // Ensure selectedRepos is properly initialized
+  const selectedRepos = Array.isArray(resume.selectedRepos) ? resume.selectedRepos : [];
+  
+  // Ensure repos is properly initialized
+  const repos = Array.isArray(resume.repos) ? resume.repos : [];
+  
+  // Ensure githubUrl is a string
+  const githubUrl = typeof resume.githubUrl === 'string' ? resume.githubUrl : "";
+  
   const baseResume = {
     id: resume.id,
     title: resume.title || "New Resume",
-    githubUrl: resume.githubUrl || "",
-    selectedRepos: resume.selectedRepos || [],
-    experience: resume.experience || [],
-    education: resume.education || [],
+    githubUrl: githubUrl,
+    githubId: resume.githubId || '',
+    selectedRepos: selectedRepos,
+    experience: experience,
+    education: education,
     template: resume.template || "modern",
     colorScheme: resume.colorScheme || "default",
     links: resume.links ? Object.fromEntries(
       Object.entries(resume.links).filter(([_, value]) => value !== undefined && value !== null && value !== '')
     ) : {},
-    repos: resume.repos || [],
+    repos: repos,
     summaries: resume.summaries || {},
+    noexperienced: typeof resume.noexperienced === 'boolean' ? resume.noexperienced : false,
     createdAt: resume.createdAt,
     updatedAt: resume.updatedAt,
   };
@@ -110,16 +146,23 @@ const ensureResumeStructure = (resume: any): ResumeData => {
   if (resume.seoTitle) baseResume.seoTitle = resume.seoTitle;
   if (resume.seoDescription) baseResume.seoDescription = resume.seoDescription;
 
+  console.log('ensureResumeStructure: Processed experience:', experience);
+  console.log('ensureResumeStructure: Processed githubUrl:', githubUrl);
+  console.log('ensureResumeStructure: GitHub ID:', baseResume.githubId);
+  console.log('ensureResumeStructure: No Experience flag:', baseResume.noexperienced);
+
   return baseResume;
 };
 
 export function useResumeData() {
+  // Always call hooks in the same order
   const { data: session, status } = useSession();
   const [resumes, setResumes] = useState<ResumeData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentResume, setCurrentResume] = useState<ResumeData | null>(null);
 
+  // Derive userId from session
   const userId = session?.user?.id;
   
   console.log('useResumeData: Session status:', status);
@@ -132,15 +175,19 @@ export function useResumeData() {
     console.log('useResumeData: Session status:', status);
     console.log('useResumeData: Full session data:', session);
     
-    // Only proceed if session is authenticated and we have a userId
+    // Default unsubscribe function
+    let unsubscribe = () => {};
+    
+    // Clear state if not authenticated
     if (status !== 'authenticated' || !userId) {
       console.log('useResumeData: Session not ready or no userId, clearing resumes');
       setResumes([]);
       setCurrentResume(null);
       setLoading(false);
-      return;
+      return () => unsubscribe();
     }
 
+    // Set loading state
     setLoading(true);
     setError(null);
     console.log('useResumeData: Subscribing to resumes for userId:', userId);
@@ -148,7 +195,7 @@ export function useResumeData() {
     console.log('useResumeData: User ID length:', userId?.length);
 
     // Subscribe to real-time updates
-    const unsubscribe = subscribeToResumes(userId, (resumeList) => {
+    unsubscribe = subscribeToResumes(userId, (resumeList) => {
       console.log('useResumeData: Received resumeList:', resumeList);
       const normalizedResumes = resumeList.map(ensureResumeStructure);
       console.log('useResumeData: Normalized resumes:', normalizedResumes);
@@ -174,11 +221,11 @@ export function useResumeData() {
       console.log('useResumeData: Unsubscribing from resumes');
       unsubscribe();
     };
-  }, [userId]);
+  }, [userId, status, session]);
 
   // Save resume data
   const saveResume = useCallback(async (resumeData: ResumeData) => {
-    if (!userId) {
+    if (!userId || status !== 'authenticated') {
       setError('User not authenticated');
       return { success: false, error: 'User not authenticated' };
     }
@@ -188,6 +235,14 @@ export function useResumeData() {
 
     // Ensure the resume data has proper structure
     const normalizedResumeData = ensureResumeStructure(resumeData);
+
+    // Log the resume data to ensure all fields are being saved
+    console.log('saveResume: Resume data:', normalizedResumeData);
+    console.log('saveResume: Experience data:', normalizedResumeData.experience);
+    console.log('saveResume: Education data:', normalizedResumeData.education);
+    console.log('saveResume: GitHub profile data:', normalizedResumeData.githubProfile);
+    console.log('saveResume: GitHub URL:', normalizedResumeData.githubUrl);
+    console.log('saveResume: Repos count:', normalizedResumeData.repos?.length);
 
     try {
       if (normalizedResumeData.id) {
@@ -204,7 +259,8 @@ export function useResumeData() {
         // Create new resume
         const result = await createResume(userId, normalizedResumeData);
         if (result.success) {
-          setCurrentResume({ ...normalizedResumeData, id: result.resumeId });
+          const updatedResume = { ...normalizedResumeData, id: result.resumeId };
+          setCurrentResume(updatedResume);
           return { success: true, resumeId: result.resumeId };
         } else {
           setError('Failed to create resume');
@@ -218,11 +274,11 @@ export function useResumeData() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, status, setLoading, setError, setCurrentResume, session]);
 
   // Load specific resume
   const loadResume = useCallback(async (resumeId: string) => {
-    if (!userId) {
+    if (!userId || status !== 'authenticated') {
       setError('User not authenticated');
       return null;
     }
@@ -247,11 +303,11 @@ export function useResumeData() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, status, setLoading, setError, setCurrentResume, session]);
 
   // Delete resume
   const deleteResumeData = useCallback(async (resumeId: string) => {
-    if (!userId) {
+    if (!userId || status !== 'authenticated') {
       setError('User not authenticated');
       return { success: false, error: 'User not authenticated' };
     }
@@ -277,18 +333,18 @@ export function useResumeData() {
     } finally {
       setLoading(false);
     }
-  }, [userId, currentResume]);
+  }, [userId, status, currentResume, setLoading, setError, setCurrentResume, session]);
 
   // Auto-save functionality
   const autoSave = useCallback(async (resumeData: ResumeData) => {
-    if (!userId) return;
+    if (!userId || status !== 'authenticated') return;
 
     try {
       await saveResume(resumeData);
     } catch (err) {
       console.error('Auto-save failed:', err);
     }
-  }, [userId, saveResume]);
+  }, [userId, status, saveResume, session]);
 
   return {
     resumes,

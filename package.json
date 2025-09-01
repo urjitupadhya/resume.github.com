@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "portfolio-generator",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@emotion/is-prop-valid": "latest",
     "@genkit-ai/googleai": "^1.16.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
@@ -45,6 +46,7 @@
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
+    "framer-motion": "latest",
     "firebase": "^12.2.1",
     "firebase-admin": "^13.4.0",
     "geist": "^1.3.1",

@@ -110,7 +110,7 @@ export function ResumeManager({ onLoadResume, currentResume }: ResumeManagerProp
           <DialogTrigger asChild>
             <Button size="sm" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              New Resume
+              +New Resume
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -163,8 +163,9 @@ export function ResumeManager({ onLoadResume, currentResume }: ResumeManagerProp
         ) : resumes.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground mb-4">No resumes saved yet.</p>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              Create Your First Resume
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              +New Resume
             </Button>
           </div>
         ) : (

@@ -107,13 +107,52 @@ export const createResume = async (userId: string, resumeData: any) => {
     const resumeId = newResumeRef.key;
     console.log('createResume: Generated resumeId:', resumeId);
     
-    // Clean the data by removing undefined values
-    const cleanedData = removeUndefinedValues({
+    // Process experience data to ensure all fields are properly set
+    let processedExperience = [];
+    if (Array.isArray(resumeData.experience)) {
+      console.log('createResume: Processing experience data:', resumeData.experience);
+      processedExperience = resumeData.experience.map(exp => ({
+        id: exp.id || crypto.randomUUID(),
+        title: exp.title || '',
+        company: exp.company || '',
+        start: exp.start || '',
+        end: exp.end || '',
+        bullets: Array.isArray(exp.bullets) ? exp.bullets : [],
+        tech: exp.tech || ''
+      }));
+      console.log('createResume: Processed experience data:', processedExperience);
+    } else {
+      console.log('createResume: No experience data found in resumeData');
+    }
+    
+    // Ensure experience and education arrays are properly initialized
+    const enhancedData = {
       ...resumeData,
       id: resumeId,
+      name: typeof resumeData.name === 'string' ? resumeData.name : "",
+      githubUrl: typeof resumeData.githubUrl === 'string' ? resumeData.githubUrl : "",
+      githubId: typeof resumeData.githubId === 'string' ? resumeData.githubId : "",
+      experience: processedExperience,
+      education: Array.isArray(resumeData.education) ? resumeData.education : [],
+      selectedRepos: Array.isArray(resumeData.selectedRepos) ? resumeData.selectedRepos : [],
+      repos: Array.isArray(resumeData.repos) ? resumeData.repos : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    // Ensure name, githubId and githubUrl are properly set and logged
+    console.log('createResume: Name before saving:', enhancedData.name);
+    console.log('createResume: GitHub URL before saving:', enhancedData.githubUrl);
+    console.log('createResume: GitHub ID before saving:', enhancedData.githubId);
+    
+    console.log('createResume: Enhanced data:', enhancedData);
+    console.log('createResume: Experience data:', enhancedData.experience);
+    console.log('createResume: Education data:', enhancedData.education);
+    console.log('createResume: GitHub URL:', enhancedData.githubUrl);
+    console.log('createResume: GitHub ID:', enhancedData.githubId);
+    
+    // Clean the data by removing undefined values
+    const cleanedData = removeUndefinedValues(enhancedData);
     
     console.log('createResume: Cleaned data:', cleanedData);
     await set(newResumeRef, cleanedData);
@@ -158,7 +197,10 @@ export const getResumes = async (userId: string) => {
 
 export const getResume = async (userId: string, resumeId: string) => {
   try {
-    const resumeRef = ref(db, `users/${userId}/resumes/${resumeId}`);
+    // Sanitize resumeId to remove invalid Firebase path characters
+    const sanitizedResumeId = resumeId.replace(/[.#$\[\]]/g, '_');
+    
+    const resumeRef = ref(db, `users/${userId}/resumes/${sanitizedResumeId}`);
     const snapshot = await get(resumeRef);
     return snapshot.exists() ? { id: resumeId, ...snapshot.val() } : null;
   } catch (error) {
@@ -169,13 +211,63 @@ export const getResume = async (userId: string, resumeId: string) => {
 
 export const updateResume = async (userId: string, resumeId: string, updates: any) => {
   try {
-    const resumeRef = ref(db, `users/${userId}/resumes/${resumeId}`);
+    // Sanitize resumeId to remove invalid Firebase path characters
+    const sanitizedResumeId = resumeId.replace(/[.#$\[\]]/g, '_');
+    
+    const resumeRef = ref(db, `users/${userId}/resumes/${sanitizedResumeId}`);
+    
+    // Get existing resume data to ensure we don't lose any fields
+    const existingResume = await getResume(userId, resumeId);
+    
+    // Process experience data to ensure all fields are properly set
+    let processedExperience = [];
+    if (Array.isArray(updates.experience)) {
+      console.log('updateResume: Processing experience data from updates:', updates.experience);
+      processedExperience = updates.experience.map(exp => ({
+        id: exp.id || crypto.randomUUID(),
+        title: exp.title || '',
+        company: exp.company || '',
+        start: exp.start || '',
+        end: exp.end || '',
+        bullets: Array.isArray(exp.bullets) ? exp.bullets : [],
+        tech: exp.tech || ''
+      }));
+      console.log('updateResume: Processed experience data:', processedExperience);
+    } else if (Array.isArray(existingResume?.experience)) {
+      console.log('updateResume: Using existing experience data:', existingResume.experience);
+      processedExperience = existingResume.experience;
+    } else {
+      console.log('updateResume: No experience data found in updates or existing resume');
+    }
+    
+    // Ensure experience and education arrays are preserved
+    const mergedUpdates = {
+      ...existingResume,
+      ...updates,
+      // Explicitly preserve these arrays if they exist in updates
+      name: typeof updates.name === 'string' ? updates.name : (existingResume?.name || ""),
+      githubUrl: typeof updates.githubUrl === 'string' ? updates.githubUrl : (existingResume?.githubUrl || ""),
+      githubId: typeof updates.githubId === 'string' ? updates.githubId : (existingResume?.githubId || ""),
+      experience: processedExperience,
+      education: updates.education || existingResume?.education || [],
+      selectedRepos: updates.selectedRepos || existingResume?.selectedRepos || [],
+      repos: updates.repos || existingResume?.repos || [],
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Ensure name, githubId and githubUrl are properly set and logged
+    console.log('updateResume: Name before saving:', mergedUpdates.name);
+    console.log('updateResume: GitHub URL before saving:', mergedUpdates.githubUrl);
+    console.log('updateResume: GitHub ID before saving:', mergedUpdates.githubId);
+    
+    console.log('updateResume: Merged updates:', mergedUpdates);
+    console.log('updateResume: Experience data:', mergedUpdates.experience);
+    console.log('updateResume: Education data:', mergedUpdates.education);
+    console.log('updateResume: GitHub URL:', mergedUpdates.githubUrl);
+    console.log('updateResume: GitHub ID:', mergedUpdates.githubId);
     
     // Clean the data by removing undefined values
-    const cleanedUpdates = removeUndefinedValues({
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    });
+    const cleanedUpdates = removeUndefinedValues(mergedUpdates);
     
     await update(resumeRef, cleanedUpdates);
     return { success: true };
@@ -187,7 +279,10 @@ export const updateResume = async (userId: string, resumeId: string, updates: an
 
 export const deleteResume = async (userId: string, resumeId: string) => {
   try {
-    const resumeRef = ref(db, `users/${userId}/resumes/${resumeId}`);
+    // Sanitize resumeId to remove invalid Firebase path characters
+    const sanitizedResumeId = resumeId.replace(/[.#$\[\]]/g, '_');
+    
+    const resumeRef = ref(db, `users/${userId}/resumes/${sanitizedResumeId}`);
     await remove(resumeRef);
     return { success: true };
   } catch (error) {
@@ -259,6 +354,50 @@ export const searchUsersByEmail = async (email: string) => {
   } catch (error) {
     console.error('Error searching users:', error);
     return [];
+  }
+};
+
+// Function to fetch GitHub profile name from resume
+export const fetchGitHubProfileName = async (userId: string, resumeId: string) => {
+  try {
+    console.log('fetchGitHubProfileName: Called with userId:', userId, 'resumeId:', resumeId);
+    
+    // Sanitize resumeId to remove invalid Firebase path characters
+    const sanitizedResumeId = resumeId.replace(/[.#$\[\]]/g, '_');
+    
+    const resumeRef = ref(db, `users/${userId}/resumes/${sanitizedResumeId}`);
+    const snapshot = await get(resumeRef);
+    
+    if (snapshot.exists()) {
+      const resumeData = snapshot.val();
+      console.log('fetchGitHubProfileName: Resume data:', resumeData);
+      
+      // First try to get the name directly from the resume data
+      if (resumeData.name) {
+        console.log('fetchGitHubProfileName: Found name in resume data:', resumeData.name);
+        return { success: true, name: resumeData.name };
+      }
+      
+      // If no name in resume data, try to get it from the GitHub profile
+      if (resumeData.githubProfile && resumeData.githubProfile.name) {
+        console.log('fetchGitHubProfileName: Found name in GitHub profile:', resumeData.githubProfile.name);
+        return { success: true, name: resumeData.githubProfile.name };
+      }
+      
+      // If no name in GitHub profile, try to use the GitHub ID
+      if (resumeData.githubId) {
+        console.log('fetchGitHubProfileName: Using GitHub ID as name:', resumeData.githubId);
+        return { success: true, name: resumeData.githubId };
+      }
+      
+      // If no name found anywhere, return an error
+      return { success: false, error: 'No name found in resume data' };
+    }
+    
+    return { success: false, error: 'Resume not found' };
+  } catch (error) {
+    console.error('Error fetching GitHub profile name:', error);
+    return { success: false, error: 'Error fetching GitHub profile name' };
   }
 };
 

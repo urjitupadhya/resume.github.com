@@ -2,7 +2,14 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { User } from 'next-auth';
+import { User as NextAuthUser } from 'next-auth';
+
+// Extended User interface to ensure it has an id property
+interface User extends NextAuthUser {
+  id?: string;
+  uid?: string;
+  sub?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -21,11 +28,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status !== 'loading') {
       setLoading(false);
+      
+      // Save user data to Firebase when session is available
+      if (session?.user) {
+        const saveUserToFirebase = async () => {
+          try {
+            const response = await fetch('/api/user/save', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (!response.ok) {
+              console.error('Failed to save user data to Firebase');
+            }
+          } catch (error) {
+            console.error('Error saving user to Firebase:', error);
+          }
+        };
+        
+        saveUserToFirebase();
+      }
     }
-  }, [status]);
-
-  // Note: Removed automatic user save to Firebase to prevent data loss
-  // User data will be saved only when explicitly needed (e.g., creating resumes)
+  }, [status, session])
 
   const handleSignIn = () => {
     signIn('google');
@@ -35,8 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut();
   };
 
+  // Ensure user object has id property (might be stored as uid or sub in some providers)
+  const user = session?.user ? {
+    ...session.user,
+    id: session.user.id || session.user.uid || session.user.sub || ''
+  } : null;
+
   const value: AuthContextType = {
-    user: session?.user || null,
+    user,
     loading,
     signIn: handleSignIn,
     signOut: handleSignOut,

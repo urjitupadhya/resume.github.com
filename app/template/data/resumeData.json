@@ -1,0 +1,21 @@
+{
+  "name": "John Doe",
+  "title": "Software Engineer",
+  "summary": "Passionate software engineer with experience building high-quality web applications and scalable systems.",
+  "experience": [
+    {
+      "company": "Google",
+      "role": "SDE",
+      "years": "2022-2024",
+      "description": "Worked on search infrastructure and improved query performance by 20%."
+    },
+    {
+      "company": "StartupX",
+      "role": "Frontend Engineer",
+      "years": "2020-2022",
+      "description": "Built and maintained a React-based dashboard used by 50k+ users."
+    }
+  ],
+  "education": [{ "degree": "B.Tech CSE", "college": "IIT Delhi", "year": "2022" }],
+  "skills": ["Java", "React", "SQL", "Node.js", "Tailwind CSS"]
+}

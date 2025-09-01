@@ -10,12 +10,46 @@ import { ResumeData } from '@/hooks/use-resume-data';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Eye, Download, Trash2, Calendar, Briefcase, GraduationCap, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
-  const { resumes, loading, error } = useResumeData();
   const router = useRouter();
-
+  const [isClient, setIsClient] = useState(false);
+  
+  // Always initialize the hook, but we'll only use its values when on client side
+  const resumeDataHook = useResumeData();
+  
+  // Initialize with default values
+  const [resumes, setResumes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
+  // Only use the hook values when we're on the client side
+  useEffect(() => {
+    if (isClient && status === 'authenticated') {
+      setResumes(resumeDataHook.resumes);
+      setLoading(resumeDataHook.loading);
+      setError(resumeDataHook.error);
+    }
+  }, [isClient, status, resumeDataHook.resumes, resumeDataHook.loading, resumeDataHook.error, resumeDataHook]);
+  
+  // Log the resume data for debugging
+  useEffect(() => {
+    if (isClient && status === 'authenticated') {
+      console.log('Dashboard: Loaded resumes:', resumes);
+      console.log('Dashboard: Resume count:', resumes.length);
+      if (resumes.length > 0) {
+        console.log('Dashboard: First resume experience:', resumes[0].experience);
+        console.log('Dashboard: First resume education:', resumes[0].education);
+      }
+    }
+  }, [isClient, status, resumes]);
+  
   console.log('Dashboard: session:', session);
   console.log('Dashboard: session.user:', session?.user);
   console.log('Dashboard: session.user.id:', session?.user?.id);
@@ -49,7 +83,15 @@ export default function DashboardPage() {
   }
 
   const handleLoadResume = (resume: ResumeData) => {
-    router.push(`/builder?resume=${resume.id}`);
+    if (isClient && resumeDataHook.loadResume && resume.id) {
+      resumeDataHook.loadResume(resume.id);
+    }
+    if (resume.id) {
+      router.push(`/builder?resume=${resume.id}`);
+    } else {
+      console.error('Resume ID is undefined');
+      router.push('/builder');
+    }
   };
 
   const formatDate = (dateString: string) => {

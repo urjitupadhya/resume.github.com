@@ -109,8 +109,18 @@ export const generateATSResults = async (resume: File, jobDescription: string, c
       });
       
       const response = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
-        config: {
+        model: googleAI.model(process.env.GEMINI_MODEL || 'gemini-1.5-flash'),
+        prompt: [
+          { text: prompt || ''},
+          {
+            media: {
+              contentType: uploadResult.file.mimeType,
+              url: uploadResult.file.uri,
+            },
+          },
+        ],
+        // Note: responseSchema is not supported by gemini-1.5-flash model
+        /*config: {
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'object',
@@ -175,15 +185,7 @@ export const generateATSResults = async (resume: File, jobDescription: string, c
             required: ['overallScore', 'keywordAnalysis', 'experienceQualificationMatch', 'atsCompatibility', 'detailedSuggestions'],
           },
         },
-        prompt: [
-          { text: prompt || ''},
-          {
-            media: {
-              contentType: uploadResult.file.mimeType,
-              url: uploadResult.file.uri,
-            },
-          },
-        ],
+        */
       });
       
       // The response object's types are misleading. We cast to 'any' to access the real structure.
@@ -254,7 +256,7 @@ Your task is to write a fully personalized cover letter using the following inpu
   });
 
   const response = await ai.generate({
-    model: googleAI.model('gemini-2.5-flash'),
+    model: googleAI.model(process.env.GEMINI_MODEL || 'gemini-1.5-flash'),
     prompt: [
       { text: prompt || '' },
       {

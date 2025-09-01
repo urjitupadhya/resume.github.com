@@ -19,11 +19,25 @@ export function AutoSave({ resumeData, enabled = true }: AutoSaveProps) {
   useEffect(() => {
     if (!enabled || !resumeData.title) return;
 
+    // Log the resume data being saved, especially experience data
+    console.log('AutoSave: Resume data to save:', resumeData);
+    console.log('AutoSave: Experience data:', resumeData.experience);
+
     // Create a hash of the current data to detect changes
     const currentHash = JSON.stringify(resumeData);
     
     // If data hasn't changed, don't save
-    if (currentHash === lastSavedRef.current) return;
+    if (currentHash === lastSavedRef.current) {
+      console.log('AutoSave: Data unchanged, skipping save');
+      return;
+    }
+
+    // Don't auto-save if this is a new resume without an ID and we've already saved once
+    // This prevents creating multiple new resumes when the component re-renders
+    if (!resumeData.id && lastSavedRef.current) {
+      console.log('AutoSave: Skipping save for new resume without ID that was already saved');
+      return;
+    }
 
     // Clear existing timeout
     if (timeoutRef.current) {
@@ -36,9 +50,11 @@ export function AutoSave({ resumeData, enabled = true }: AutoSaveProps) {
     // Debounce the save operation
     timeoutRef.current = setTimeout(async () => {
       try {
+        console.log('AutoSave: Saving resume data with experience:', resumeData.experience);
         await autoSave(resumeData);
         setSaveStatus('saved');
         lastSavedRef.current = currentHash;
+        console.log('AutoSave: Successfully saved resume data');
         
         // Clear saved status after 2 seconds
         setTimeout(() => {

@@ -1,16 +1,16 @@
 'use client';
 
-import { useAuth } from '../../components/auth-provider';
-import { ProtectedRoute } from '../../components/protected-route';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
+import { useAuth } from '@/components/auth-provider';
+import { ProtectedRoute } from '@/components/protected-route';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { User, Mail, Calendar, Edit, Save, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { updateUser, getUser } from '../../lib/firebase-utils';
-import { useToast } from '../../hooks/use-toast';
+import { updateUser, getUser } from '@/lib/firebase-utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ export default function ProfilePage() {
   const [editData, setEditData] = useState({
     name: user?.name || '',
     email: user?.email || '',
+    githubId: user?.githubId || '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -27,19 +28,31 @@ export default function ProfilePage() {
       setEditData({
         name: user.name || '',
         email: user.email || '',
+        githubId: user.githubId || '',
       });
     }
   }, [user]);
 
   const handleSave = async () => {
-    if (!user?.id) return;
+    // Use user.id or fall back to user.email as the userId
+    const userId = user?.id || user?.email;
+    
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "User ID not found. Please try signing out and back in.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsLoading(true);
     try {
-      const result = await updateUser(user.id, {
+      const result = await updateUser(userId, {
         profile: {
           name: editData.name,
           email: editData.email,
+          githubId: editData.githubId,
         }
       });
 
@@ -67,6 +80,7 @@ export default function ProfilePage() {
     setEditData({
       name: user?.name || '',
       email: user?.email || '',
+      githubId: user?.githubId || '',
     });
     setIsEditing(false);
   };
@@ -152,6 +166,26 @@ export default function ProfilePage() {
                       <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
                         <Mail className="h-4 w-4 text-gray-500" />
                         <span>{user?.email || 'Not provided'}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="githubId">GitHub Username</Label>
+                    {isEditing ? (
+                      <Input
+                        id="githubId"
+                        value={editData.githubId}
+                        onChange={(e) => setEditData({ ...editData, githubId: e.target.value })}
+                        placeholder="Enter your GitHub username"
+                        disabled={isLoading}
+                      />
+                    ) : (
+                      <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
+                        <svg className="h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                        </svg>
+                        <span>{user?.githubId || 'Not provided'}</span>
                       </div>
                     )}
                   </div>

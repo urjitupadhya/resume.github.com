@@ -3,6 +3,7 @@ import React from 'react'
 import { useRouter } from "next/navigation";
 
 interface ResumeCardProps {
+  id: string; // Resume ID for database lookup
   title: string;
   description: string;
   ATS_Score: number;
@@ -13,10 +14,11 @@ interface ResumeCardProps {
 
 
 
-const ResumeCard = ( { title, description, ATS_Score, createdAt, analysisResult, className }: ResumeCardProps ) => {
+const ResumeCard = ( { id, title, description, ATS_Score, createdAt, analysisResult, className }: ResumeCardProps ) => {
   const router = useRouter();
   const handleClick = () => {
-    router.push(`/resumes/${title}?analysisResult=${encodeURIComponent(analysisResult)}`);
+    // Use the sanitized resumeId from the database instead of the title
+    router.push(`/resumes/${id}?analysisResult=${encodeURIComponent(analysisResult)}&showAnalysis=true`);
   };
   return (
     <div className={`hover:border-gray-600/50 transition-all duration-200 bg-gray-800 border-gray-700/50 border rounded-xl pt-6 pr-6 pb-6 pl-6 shadow-2xl ${className || ''}`}>

@@ -13,7 +13,6 @@ import { getStorage, ref, uploadBytes, listAll, getBlob, StorageReference, getDo
 import { createResume, getResumes, updateResume } from "@/lib/firebase-utils";
 // import Navbar from "@/components/Navbar";
 
-
 interface UploadedResume {
   id: string;
   name: string;
@@ -51,12 +50,16 @@ export default function Home()  {
   }, []);
 
   useEffect(() => {
-    if (session?.user?.id) {
+    if (session?.user) {
+      // Get user ID safely
+      const userId = session.user.id || session.user.uid || session.user.sub || '';
+      if (!userId) return;
+      
       const fetchResumes = async () => {
         setIsResumesLoading(true);
         try {
           const storage = getStorage();
-          const resumesData = await getResumes(session.user.id);
+          const resumesData = await getResumes(userId);
           
           const processedResumes = resumesData.map(resume => {
             let score = 0;
@@ -74,7 +77,7 @@ export default function Home()  {
               name: resume.resumeName || resume.title || 'Untitled Resume',
               jobTitle: resume.jobTitle || '',
               atsScore: score,
-                             storageRef: ref(storage, `resumes/${session.user.id}/${resume.resumeName || resume.title}`),
+                             storageRef: ref(storage, `resumes/${userId}/${resume.resumeName || resume.title}`),
               analysisResult: resume.analysisResult,
               createdAt: resume.createdAt ? new Date(resume.createdAt).toLocaleDateString() : 'Unknown'
             };
@@ -110,24 +113,31 @@ export default function Home()  {
   };
 
   const testDatabaseConnection = async () => {
-    if (!session?.user?.id) {
+    if (!session?.user) {
       alert("Please sign in first");
+      return;
+    }
+    
+    // Get user ID safely
+    const userId = session.user.id || session.user.uid || session.user.sub || '';
+    if (!userId) {
+      alert("Unable to identify user. Please sign out and sign in again.");
       return;
     }
     
     try {
       const testData = {
-        uid: session.user.id,
+        uid: userId,
         testField: "Database connection test",
         timestamp: new Date().toISOString(),
       };
       
-      const result = await createResume(session.user.id, testData);
+      const result = await createResume(userId, testData);
       
       if (result.success) {
         alert(`Database connection successful! Test record created with ID: ${result.resumeId}`);
         // Refresh the resumes list
-        const resumes = await getResumes(session.user.id);
+        const resumes = await getResumes(userId);
         console.log('Current resumes in database:', resumes);
       } else {
         alert(`Database connection failed: ${result.error}`);
@@ -243,9 +253,24 @@ export default function Home()  {
         if (result.length > 0) {
           const cleaned = result.replace(/```json\n|```/g, '').trim();
           
-                     // Save resume data to Firebase Realtime Database
+                     // Check if session and user exist before proceeding
+           if (!session || !session.user) {
+             alert("You must be logged in to save your resume analysis. Please sign in and try again.");
+             setIsLoading(false);
+             return;
+           }
+           
+           // Get user ID safely
+           const userId = session.user.id || session.user.uid || session.user.sub || '';
+           if (!userId) {
+             alert("Unable to identify user. Please sign out and sign in again.");
+             setIsLoading(false);
+             return;
+           }
+           
+           // Save resume data to Firebase Realtime Database
            const resumeData = {
-             uid: session.user.id,
+             uid: userId,
              resumeName: resume.name,
              jobTitle: jobTitle,
              companyName: companyName,
@@ -255,17 +280,19 @@ export default function Home()  {
              fileSize: resume.size,
              fileType: resume.type,
              createdAt: new Date().toISOString(),
+             updatedAt: new Date().toISOString(),
+             title: `${jobTitle} at ${companyName}`, // Required by Firebase validation rules
            };
            
-           const createResult = await createResume(session.user.id, resumeData);
+           const createResult = await createResume(userId, resumeData);
           
           if (createResult.success) {
             console.log('Resume saved to Realtime Database with ID:', createResult.resumeId);
             
                          // Upload files to Firebase Storage
              const storage = getStorage();
-             const storageRef = ref(storage, `resumes/${session.user.id}/${resume.name}.png`);
-             const resumeRef = ref(storage, `resumes/${session.user.id}/${resume.name}`);
+             const storageRef = ref(storage, `resumes/${userId}/${resume.name}.png`);
+             const resumeRef = ref(storage, `resumes/${userId}/${resume.name}`);
             
             uploadBytes(storageRef, imageBlob).then((snapshot) => {
                 console.log('Uploaded resume preview image!');
@@ -274,7 +301,9 @@ export default function Home()  {
                 console.log('Uploaded original resume file!');
             });
             
-            router.push(`/resumes/${resume.name}?analysisResult=${encodeURIComponent(cleaned)}`);
+            // Sanitize resume name for use as ID in URL
+            const sanitizedResumeId = createResult.resumeId;
+            router.push(`/resumes/${sanitizedResumeId}?analysisResult=${encodeURIComponent(cleaned)}&showAnalysis=true`);
           } else {
             console.error('Failed to save resume to database:', createResult.error);
             alert("Resume analysis completed but failed to save to database. Please try again.");

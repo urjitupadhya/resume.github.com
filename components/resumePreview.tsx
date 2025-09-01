@@ -4,9 +4,9 @@ import { CheckCircle, Eye, FileText } from "lucide-react";
 
 const ResumePreview = () => {
   return (
-    <div className="relative animate-float">
+    <div className="relative animate-float ">
       {/* Main Resume Preview */}
-      <div className="relative rounded-2xl shadow-card overflow-hidden glass-morphism border border-white/20">
+      <div className="relative rounded-2xl shadow-card overflow-hidden glass-morphism border border-white/20 bg-gradient-to-r from-white to-zinc-200">
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
           {/* Browser-like header */}
           <div className="flex items-center gap-2">

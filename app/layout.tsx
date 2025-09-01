@@ -6,9 +6,9 @@ import { Providers } from '../components/providers'
 import './globals.css'
 import Navigation from '@/components/navigation'
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Portfolio Generator',
+  description: 'Created with Shubh Varshney',
+  generator: 'Shubh Varshney',
 }
 
 export default function RootLayout({

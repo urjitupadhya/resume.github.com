@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useResumeData } from '@/hooks/use-resume-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,17 +10,22 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Edit, Download, ArrowLeft, Calendar, MapPin, Mail, Globe, Github, Linkedin, Twitter } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ResumeDetailCard from '@/components/ResumeDetailCard';
 
 export default function ResumeViewPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const analysisResult = searchParams.get('analysisResult');
   const { data: session } = useSession();
   const { loadResume, loading, error } = useResumeData();
   const [resume, setResume] = useState<any>(null);
 
   useEffect(() => {
     if (id && session?.user?.id) {
-      loadResume(id as string).then((loadedResume) => {
+      // Sanitize the resumeId from URL to match Firebase path requirements
+      const sanitizedResumeId = (id as string).replace(/[.#$\[\]]/g, '_');
+      loadResume(sanitizedResumeId).then((loadedResume) => {
         if (loadedResume) {
           setResume(loadedResume);
         }
@@ -115,8 +120,9 @@ export default function ResumeViewPage() {
 </head>
 <body>
     <div class="header">
-        <div class="name">${resume.name || 'Your Name'}</div>
-        <div class="title">${resume.role || 'Your Title'}</div>
+       <div class="name">${resume.name || '💙 ATS Insights Dashboard ✨'}</div>
+
+ 
         <div class="contact">
             ${resume.location ? `<div>${resume.location}</div>` : ''}
             ${resume.links?.email ? `<div>${resume.links.email}</div>` : ''}
@@ -129,13 +135,13 @@ export default function ResumeViewPage() {
         <p>${resume.bio}</p>
     </div>` : ''}
 
-    ${resume.experience.length > 0 ? `<div class="section">
+    ${resume.experience && resume.experience.length > 0 ? `<div class="section">
         <div class="section-title">Experience</div>
         ${resume.experience.map((exp: any) => `
             <div class="item">
                 <div class="item-header">${exp.title} at ${exp.company}</div>
                 <div class="item-subheader">${exp.start} - ${exp.end || 'Present'}</div>
-                ${exp.bullets.length > 0 ? `<ul class="bullets">
+                ${exp.bullets && exp.bullets.length > 0 ? `<ul class="bullets">
                     ${exp.bullets.map((bullet: string) => `<li>${bullet}</li>`).join('')}
                 </ul>` : ''}
                 ${exp.tech ? `<div><strong>Technologies:</strong> ${exp.tech}</div>` : ''}
@@ -143,7 +149,7 @@ export default function ResumeViewPage() {
         `).join('')}
     </div>` : ''}
 
-    ${resume.education.length > 0 ? `<div class="section">
+    ${resume.education && resume.education.length > 0 ? `<div class="section">
         <div class="section-title">Education</div>
         ${resume.education.map((edu: any) => `
             <div class="item">
@@ -155,16 +161,16 @@ export default function ResumeViewPage() {
         `).join('')}
     </div>` : ''}
 
-    ${resume.selectedRepos.length > 0 ? `<div class="section">
+    ${resume.selectedRepos && resume.selectedRepos.length > 0 ? `<div class="section">
         <div class="section-title">Projects</div>
         ${resume.selectedRepos.map((repoName: string) => {
-            const repo = resume.repos.find((r: any) => r.full_name === repoName);
+            const repo = resume.repos && resume.repos.find((r: any) => r.full_name === repoName);
             const summaries = resume.summaries?.[repoName] || [];
             return `
                 <div class="item">
                     <div class="item-header">${repo?.name || repoName}</div>
                     ${repo?.description ? `<div class="item-subheader">${repo.description}</div>` : ''}
-                    ${summaries.length > 0 ? `<ul class="bullets">
+                    ${summaries && summaries.length > 0 ? `<ul class="bullets">
                         ${summaries.map((summary: string) => `<li>${summary}</li>`).join('')}
                     </ul>` : ''}
                 </div>
@@ -212,9 +218,8 @@ export default function ResumeViewPage() {
         <CardContent className="p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">{resume.name || 'Your Name'}</h1>
-            <p className="text-xl text-muted-foreground mb-4">{resume.role || 'Your Title'}</p>
-            
+            <h1 className="text-3xl font-bold mb-2">{resume.name || '💙 ATS Insights Dashboard ✨'}</h1>
+           
             <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground">
               {resume.location && (
                 <div className="flex items-center gap-1">
@@ -283,7 +288,7 @@ export default function ResumeViewPage() {
                           <div>{exp.start} - {exp.end || 'Present'}</div>
                         </div>
                       </div>
-                      {exp.bullets.length > 0 && (
+                      {exp.bullets && exp.bullets.length > 0 && (
                         <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
                           {exp.bullets.map((bullet: string, bulletIndex: number) => (
                             <li key={bulletIndex}>{bullet}</li>
@@ -304,7 +309,7 @@ export default function ResumeViewPage() {
           )}
 
           {/* Education */}
-          {resume.education.length > 0 && (
+          {resume.education && resume.education.length > 0 && (
             <>
               <Separator className="my-6" />
               <div className="mb-6">
@@ -336,7 +341,7 @@ export default function ResumeViewPage() {
           )}
 
           {/* Projects */}
-          {resume.selectedRepos.length > 0 && (
+          {resume.selectedRepos && resume.selectedRepos.length > 0 && (
             <>
               <Separator className="my-6" />
               <div className="mb-6">
@@ -379,6 +384,20 @@ export default function ResumeViewPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Display ATS Analysis Results if available and needed */}
+      {analysisResult && searchParams.get('showAnalysis') === 'true' && (
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>ATS Analysis Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResumeDetailCard analysisResult={analysisResult} title={id as string} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

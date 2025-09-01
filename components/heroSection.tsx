@@ -3,16 +3,17 @@ import { ArrowRight, Target } from "lucide-react";
 import FeatureBadges from "./featureBadges";
 // import TrustIndicators from "./trustIndicators";
 import ResumePreview from "./resumePreview";
+import Link from "next/link";
 
 const HeroSection = () => {
   return (
-    <div className="relative min-h-screen hero-gradient overflow-hidden">
+    <div className="relative min-h-screen hero-gradient overflow-hidden bg-gradient-to-b from-blue-50 to-blue-200">
       {/* Background decoration */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
       <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/10 rounded-full blur-3xl"></div>
       
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 ">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center min-h-screen py-12">
           {/* Left Column - Content */}
           <div className="space-y-8">
@@ -42,14 +43,18 @@ const HeroSection = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: "0.4s" }}>
+              <Link href="/builder">
               <Button size="lg" className="group">
                 Start Building Now
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
+              </Link>
+              <Link href="/ats-score">
               <Button variant="outline" size="lg">
                 <Target className="w-4 h-4 mr-2" />
                 Get ATS Score
               </Button>
+              </Link>
             </div>
 
             {/* Trust indicators */}
